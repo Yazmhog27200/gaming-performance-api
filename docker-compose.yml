@@ -1,0 +1,131 @@
+version: '3.8'
+
+services:
+
+  # ============================================================
+  # Base de données PostgreSQL
+  # ============================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: gaming-postgres
+    environment:
+      POSTGRES_DB: gaming_db
+      POSTGRES_USER: gaming
+      POSTGRES_PASSWORD: gaming123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gaming -d gaming_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================
+  # Application Spring Boot
+  # ============================================================
+  app:
+    build: .
+    container_name: gaming-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      DB_HOST: postgres
+      DB_USER: gaming
+      DB_PASS: gaming123
+      KAFKA_SERVERS: kafka:9092
+      JAVA_OPTS: "-Xms512m -Xmx1024m -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+    ports:
+      - "8080:8080"
+    # Décommenter pour profiling JVM
+    # JVM_DEBUG: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+
+  # ============================================================
+  # Monitoring : Prometheus
+  # ============================================================
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: gaming-prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--storage.tsdb.retention.time=7d'
+
+  # ============================================================
+  # Visualisation : Grafana
+  # ============================================================
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: gaming-grafana
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    ports:
+      - "3000:3000"
+
+  # ============================================================
+  # Kafka : ZooKeeper
+  # ============================================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: gaming-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  # ============================================================
+  # Kafka Broker
+  # ============================================================
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: gaming-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+
+  # ============================================================
+  # Kafka UI (debug)
+  # ============================================================
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: gaming-kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  grafana_data:

@@ -1,0 +1,15 @@
+target/
+*.class
+*.jar
+*.war
+.idea/
+*.iml
+.mvn/
+mvnw
+mvnw.cmd
+jmeter/results/*.csv
+jmeter/results/*.jtl
+prometheus_data/
+grafana_data/
+postgres_data/
+.env

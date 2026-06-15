@@ -1,0 +1,77 @@
+spring:
+  application:
+    name: gaming-performance-api
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:5432/gaming_db
+    username: ${DB_USER:gaming}
+    password: ${DB_PASS:gaming123}
+    driver-class-name: org.postgresql.Driver
+    # ANTI-PATTERN: pool HikariCP avec configuration par défaut (10 connexions max)
+    # A optimiser Jour 4 : augmenter maximum-pool-size selon charge réelle
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        # ANTI-PATTERN: pas de second-level cache Hibernate
+        # ANTI-PATTERN: pas de batch insert/update
+        jdbc:
+          batch_size: 0
+
+  kafka:
+    bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
+    consumer:
+      group-id: gaming-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+  # Cache désactivé initialement (anti-pattern - à activer Jour 4)
+  cache:
+    type: none
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics,threaddump,heapdump
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+server:
+  port: 8080
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 10
+
+# Logs SQL activés pour analyser les requêtes (Jour 3)
+logging:
+  level:
+    root: INFO
+    com.gaming.api: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql: TRACE
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+# Données de seed
+app:
+  seed:
+    enabled: true
+    players: 10000
+    matches: 200000
