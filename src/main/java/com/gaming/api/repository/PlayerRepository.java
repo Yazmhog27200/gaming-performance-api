@@ -31,4 +31,31 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
 
     @Query("SELECT COUNT(p) FROM Player p")
     Long countTotal();
+
+    @Query("""
+        SELECT p.id, p.username, p.region, p.mmr,
+               COUNT(mp),
+               SUM(CASE WHEN mp.result = 'WIN' THEN 1 ELSE 0 END),
+               SUM(CASE WHEN mp.result = 'LOSS' THEN 1 ELSE 0 END),
+               SUM(CASE WHEN mp.result = 'DRAW' THEN 1 ELSE 0 END),
+               AVG(mp.score),
+               SUM(mp.match.durationSeconds)
+        FROM Player p
+        LEFT JOIN p.matchPlayers mp
+        WHERE p.id = :playerId
+        GROUP BY p.id, p.username, p.region, p.mmr
+        """)
+    List<Object[]> findAggregateStatsByPlayerId(@Param("playerId") Long playerId);
+
+    @Query(value = """
+        SELECT p.id, p.username, p.mmr,
+               CAST(COALESCE(SUM(CASE WHEN mp.result = 'WIN' THEN 1.0 ELSE 0.0 END), 0) AS float)
+               / NULLIF(COUNT(mp.id), 0)
+        FROM players p
+        LEFT JOIN match_players mp ON mp.player_id = p.id
+        GROUP BY p.id, p.username, p.mmr
+        ORDER BY p.mmr DESC
+        LIMIT 10
+        """, nativeQuery = true)
+    List<Object[]> findTopPlayersWithWinRate();
 }

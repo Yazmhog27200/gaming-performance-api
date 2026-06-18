@@ -1,7 +1,6 @@
 package com.gaming.api.service;
 
 import com.gaming.api.dto.DashboardDTO;
-import com.gaming.api.entity.Player;
 import com.gaming.api.repository.MatchPlayerRepository;
 import com.gaming.api.repository.MatchRepository;
 import com.gaming.api.repository.PlayerRepository;
@@ -10,12 +9,11 @@ import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,25 +28,18 @@ public class DashboardService {
     private final MatchRepository matchRepository;
     private final PlayerRepository playerRepository;
     private final MatchPlayerRepository matchPlayerRepository;
-    private final PlayerService playerService;
     private final MeterRegistry meterRegistry;
 
-    // ANTI-PATTERN: endpoint dashboard NON mis en cache
-    // Cet endpoint est fortement sollicité (appelé par le frontend toutes les 5s)
-    // Chaque appel exécute 8+ requêtes SQL lourdes + calculs Java
-    // OPTIMISATION Jour 4 : @Cacheable(value="dashboard", key="'global'") avec TTL 10s
+    @Cacheable(value = "dashboard", key = "'global'")
     @Transactional(readOnly = true)
     public DashboardDTO getDashboard() {
         Timer.Sample sample = Timer.start(meterRegistry);
-        log.info("Building dashboard — NO CACHE — executing all queries...");
+        log.info("Building dashboard (cache miss) — executing queries...");
 
         try {
             // Stats plateforme (6 requêtes SQL)
             DashboardDTO.PlatformStatsDTO platformStats = buildPlatformStats();
 
-            // Top 10 joueurs (1 requête SQL pour récupérer les joueurs par MMR)
-            // ANTI-PATTERN N+1 : pour chaque joueur dans le top, calcule ses stats
-            // = 10 appels à getPlayerStats() = 10 * (1 + N requêtes par joueur)
             List<DashboardDTO.TopPlayerDTO> topPlayers = buildTopPlayers();
 
             // Distribution par région (1 requête SQL)
@@ -82,29 +73,14 @@ public class DashboardService {
         );
     }
 
-    // ANTI-PATTERN N+1 MAJEUR :
-    // 1 requête pour récupérer les top 10 joueurs
-    // + pour CHAQUE joueur : playerService.getPlayerStats() = 1 requête Player + 1 requête MatchPlayer (tous les matchs)
-    // = 1 + 10*2 = 21 requêtes SQL minimum pour 10 joueurs
-    // Si chaque joueur a 500 matchs → charge 5000 entités en mémoire
-    // OPTIMISATION Jour 4 : requête SQL directe avec JOIN et agrégation
     private List<DashboardDTO.TopPlayerDTO> buildTopPlayers() {
-        List<Player> topPlayers = playerRepository.findTopByMmr(PageRequest.of(0, 10));
-
-        return topPlayers.stream().map(player -> {
-            // N+1 ici : un appel de stats complet par joueur
-            try {
-                var stats = playerService.getPlayerStats(player.getId());
-                return new DashboardDTO.TopPlayerDTO(
-                        player.getId(),
-                        player.getUsername(),
-                        player.getMmr(),
-                        stats.getWinRate()
-                );
-            } catch (Exception e) {
-                return new DashboardDTO.TopPlayerDTO(player.getId(), player.getUsername(), player.getMmr(), 0.0);
-            }
-        }).collect(Collectors.toList());
+        List<Object[]> rows = playerRepository.findTopPlayersWithWinRate();
+        return rows.stream().map(row -> new DashboardDTO.TopPlayerDTO(
+                ((Number) row[0]).longValue(),
+                (String) row[1],
+                row[2] == null ? 0 : ((Number) row[2]).intValue(),
+                row[3] == null ? 0.0 : ((Number) row[3]).doubleValue() * 100
+        )).collect(Collectors.toList());
     }
 
     private Map<String, Long> buildMatchesByRegion() {

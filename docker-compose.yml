@@ -37,7 +37,7 @@ services:
       DB_HOST: postgres
       DB_USER: gaming
       DB_PASS: gaming123
-      KAFKA_SERVERS: kafka:9092
+      KAFKA_SERVERS: kafka:29092
       JAVA_OPTS: "-Xms512m -Xmx1024m -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
     ports:
       - "8080:8080"

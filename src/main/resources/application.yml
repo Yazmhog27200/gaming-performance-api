@@ -7,8 +7,11 @@ spring:
     username: ${DB_USER:gaming}
     password: ${DB_PASS:gaming123}
     driver-class-name: org.postgresql.Driver
-    # ANTI-PATTERN: pool HikariCP avec configuration par défaut (10 connexions max)
-    # A optimiser Jour 4 : augmenter maximum-pool-size selon charge réelle
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
 
   jpa:
     hibernate:
@@ -34,9 +37,13 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
-  # Cache désactivé initialement (anti-pattern - à activer Jour 4)
   cache:
-    type: none
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=60s
+    cache-names:
+      - dashboard
+      - playerStats
 
 management:
   endpoints:

@@ -126,7 +126,7 @@ public class DataSeeder implements CommandLineRunner {
             matchBatch.add(new Object[]{gameMode, status, duration, serverId, region, created});
 
             if (matchBatch.size() == batchSize || i == matchCount - 1) {
-                int[][] keys = jdbcTemplate.batchUpdate(
+                jdbcTemplate.batchUpdate(
                     "INSERT INTO matches (game_mode, status, duration_seconds, server_id, region, created_at) VALUES (?,?,?,?,?,?)",
                     matchBatch
                 );

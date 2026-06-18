@@ -6,9 +6,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "match_players")
-// ANTI-PATTERN: pas d'index composite sur (match_id, player_id)
-// OPTIMISATION Jour 4 : @Table(indexes={@Index(columnList="match_id"), @Index(columnList="player_id")})
+@Table(name = "match_players", indexes = {
+    @Index(name = "idx_mp_match_id", columnList = "match_id"),
+    @Index(name = "idx_mp_player_id", columnList = "player_id")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -18,12 +19,11 @@ public class MatchPlayer {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // ANTI-PATTERN: FetchType.EAGER sur les deux côtés
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "match_id", nullable = false)
     private Match match;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "player_id", nullable = false)
     private Player player;
 

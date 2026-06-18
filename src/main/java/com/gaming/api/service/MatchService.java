@@ -15,6 +15,7 @@ import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,18 +48,9 @@ public class MatchService {
         }
     }
 
-    // ANTI-PATTERN: pagination côté Java
-    // findAll() charge TOUTES les lignes de la table en mémoire (200 000 lignes !)
-    // puis subList() applique la pagination en Java
-    // Provoque : OOM, GC excessif, saturation du pool JDBC, latence explosive
-    // OPTIMISATION Jour 4 : utiliser Pageable et passer la pagination à la DB
     @Transactional(readOnly = true)
     public List<MatchDTO> getAll(int page, int size) {
-        log.debug("Loading ALL matches from DB for Java-side pagination — anti-pattern!");
-        List<Match> all = matchRepository.findAll(); // charge tout en mémoire
-        int from = Math.min(page * size, all.size());
-        int to = Math.min(from + size, all.size());
-        return all.subList(from, to).stream()
+        return matchRepository.findAll(PageRequest.of(page, size)).stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }

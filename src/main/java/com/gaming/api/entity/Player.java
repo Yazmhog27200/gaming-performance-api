@@ -1,5 +1,6 @@
 package com.gaming.api.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -10,9 +11,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "players")
-// ANTI-PATTERN: pas d'@Index sur username, region, mmr (colonnes filtrées fréquemment)
-// OPTIMISATION Jour 4 : ajouter @Table(name="players", indexes={@Index(name="idx_player_username", columnList="username"), ...})
+@Table(name = "players", indexes = {
+    @Index(name = "idx_player_mmr", columnList = "mmr"),
+    @Index(name = "idx_player_region", columnList = "region")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -37,10 +39,8 @@ public class Player {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    // ANTI-PATTERN: FetchType.EAGER charge TOUS les matchs du joueur à chaque findById
-    // Provoque des requêtes massives et inutiles quand on veut juste le profil du joueur
-    // OPTIMISATION Jour 4 : passer à FetchType.LAZY
-    @OneToMany(mappedBy = "player", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    @JsonIgnore
+    @OneToMany(mappedBy = "player", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private List<MatchPlayer> matchPlayers = new ArrayList<>();
 
     @PrePersist
