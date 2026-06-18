@@ -13,16 +13,18 @@ global:
 
 scrape_configs:
 
-  # Prometheus se scrappe lui-même
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
 
-  # Application Spring Boot via Micrometer
   - job_name: 'gaming-api'
     metrics_path: /actuator/prometheus
     scrape_interval: 10s
     static_configs:
-      - targets: ['host.docker.internal:8080']
-    # Si app tourne dans Docker Compose, utiliser le nom du service :
-    # - targets: ['app:8080']
+      - targets: ['gaming-api:8080']
+
+  - job_name: 'gaming-gateway'
+    metrics_path: /actuator/prometheus
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['gaming-gateway:8080']

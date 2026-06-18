@@ -40,9 +40,21 @@ services:
       KAFKA_SERVERS: kafka:29092
       JAVA_OPTS: "-Xms512m -Xmx1024m -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
     ports:
+      - "8081:8080"
+
+  # ============================================================
+  # API Gateway (Spring Cloud Gateway)
+  # ============================================================
+  gateway:
+    build: ./gateway-service
+    container_name: gaming-gateway
+    depends_on:
+      - app
+    environment:
+      API_HOST: gaming-api
+      API_PORT: 8080
+    ports:
       - "8080:8080"
-    # Décommenter pour profiling JVM
-    # JVM_DEBUG: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
 
   # ============================================================
   # Monitoring : Prometheus

@@ -1,0 +1,56 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: gaming-gateway
+  cloud:
+    gateway:
+      routes:
+        - id: gaming-api-routes
+          uri: http://${API_HOST:gaming-api}:${API_PORT:8081}
+          predicates:
+            - Path=/api/**
+          filters:
+            - AddRequestHeader=X-Gateway-Source, gaming-gateway
+            - AddResponseHeader=X-Served-By, gaming-gateway
+
+        - id: gaming-api-actuator
+          uri: http://${API_HOST:gaming-api}:${API_PORT:8081}
+          predicates:
+            - Path=/actuator/**
+          filters:
+            - AddRequestHeader=X-Gateway-Source, gaming-gateway
+
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  level:
+    root: INFO
+    org.springframework.cloud.gateway: DEBUG
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
